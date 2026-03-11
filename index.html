@@ -34,10 +34,28 @@
     .app{
       height:100vh;
       display:grid;
-      grid-template-columns:360px 1fr 520px;
-      gap:12px;
+      grid-template-columns:var(--leftW,360px) 10px minmax(420px,1fr) 10px var(--rightW,520px);
+      gap:0;
       padding:12px;
+      align-items:stretch;
     }
+    .pane{min-width:0}
+    .splitter{
+      position:relative;
+      cursor:col-resize;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+    }
+    .splitter::before{
+      content:'';
+      width:2px;
+      height:calc(100% - 24px);
+      border-radius:999px;
+      background:rgba(78,195,230,.4);
+    }
+    .splitter:hover::before,.splitter.dragging::before{background:rgba(78,195,230,.9)}
     .panel{
       background:rgba(47,69,98,.98);
       border:1px solid rgba(78,195,230,.35);
@@ -184,14 +202,14 @@
     .small-btns{display:flex;gap:8px;flex-wrap:wrap}
     .muted{color:var(--muted)}
     @media (max-width:1400px){
-      .app{grid-template-columns:320px 1fr 480px}
+      .app{grid-template-columns:var(--leftW,320px) 10px minmax(360px,1fr) 10px var(--rightW,440px)}
       .center-top{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <section class="panel left">
+  <div class="app" id="appGrid">
+    <section class="panel left pane">
       <div class="hdr"><div><div class="brand">ENGAGE Workout Builder</div><div class="sub">Live planner for PRIME / BUILD / BLAST</div></div><button id="reloadBtn">Reload Data</button></div>
       <div class="pad controls">
         <div class="group">
@@ -230,8 +248,9 @@
         <div class="list" id="moveList"></div>
       </div>
     </section>
+    <div class="splitter" id="splitterLeft" title="Drag to resize"></div>
 
-    <section class="panel center">
+    <section class="panel center pane">
       <div class="hdr"><div><h2>Move Info</h2><div class="sub">Click a move to inspect details, links, and alternates</div></div></div>
       <div class="center-top">
         <div class="body-card">
@@ -284,8 +303,9 @@
         <div class="footer-note">Scaffold includes drag/drop slots, live filtering, conflict detection, stored state, CSV endpoints, and placeholders for future random generation and printable notes page.</div>
       </div>
     </section>
+    <div class="splitter" id="splitterRight" title="Drag to resize"></div>
 
-    <section class="panel right">
+    <section class="panel right pane">
       <div class="hdr"><div><h2>Template Builder</h2><div class="sub">Drag moves into the workout layout</div></div><div class="small-btns"><button id="clearBtn">Clear</button><button id="saveBtn">Save Local</button></div></div>
       <div class="template-toolbar">
         <select id="focusDaySelect"><option value="1">Day 1</option><option value="2">Day 2</option><option value="3">Day 3</option></select>
@@ -333,6 +353,9 @@
     const MUSCLE_TARGETS=['Chest','Back','Shoulders','Biceps','Triceps','Core','Glutes','Quads','Hamstrings','Calves','Adductors','Abductors'];
 
     const el={
+      appGrid:document.getElementById('appGrid'),
+      splitterLeft:document.getElementById('splitterLeft'),
+      splitterRight:document.getElementById('splitterRight'),
       movementsUrl:document.getElementById('movementsUrl'),
       modsUrl:document.getElementById('modsUrl'),
       reloadBtn:document.getElementById('reloadBtn'),
@@ -447,10 +470,10 @@
     function inferEquipmentFromName(name,category,subcategory){
       const s=lower(name), c=lower(category), sc=lower(subcategory);
       const out=[];
-      if(/\bbw\b|body weight|push up|plank|bird dog|superman|pogo|mile|sprint|pull up|walking lunge/.test(s)) out.push('Body Weight');
-      if(/\bdb\b|dumbbell|goblet|bench press/.test(s)) out.push('Dumbbell');
-      if(/\bkb\b|kettlebell|racked squat/.test(s)) out.push('Kettlebell');
-      if(/\bbb\b|barbell|front squat|rdl|sumo deadlift/.test(s)) out.push('Barbell');
+      if(/bw|body weight|push up|plank|bird dog|superman|pogo|mile|sprint|pull up|walking lunge/.test(s)) out.push('Body Weight');
+      if(/db|dumbbell|goblet|bench press/.test(s)) out.push('Dumbbell');
+      if(/kb|kettlebell|racked squat/.test(s)) out.push('Kettlebell');
+      if(/bb|barbell|front squat|rdl|sumo deadlift/.test(s)) out.push('Barbell');
       if(/bosu/.test(s)) out.push('Bosu');
       if(/bench|step up|elevated|rear foot elevated|front foot elevated|box squat/.test(s)) out.push('Bench');
       if(/med ball|slam/.test(s)) out.push('Medball');
@@ -462,7 +485,7 @@
       if(/waves/.test(s) || sc==='ropes') out.push('Ropes');
       if((/forward push|reverse pull/.test(s) || sc==='tank') && c==='endurance') out.push('Tank');
       if(/trap bar/.test(s)) out.push('Trap Bar');
-      if(/\bssb\b/.test(s)) out.push('SSB');
+      if(/ssb/.test(s)) out.push('SSB');
       if(/landmine/.test(s)) out.push('Landmine');
       if(/trx/.test(s)) out.push('TRX');
       if(/slider/.test(s)) out.push('Slider');
@@ -509,8 +532,8 @@
       if(c1==='endurance') return 3;
       if(c1==='power') return 5;
       if(c1==='core') return /side plank|pallof/.test(s)?5:3;
-      if(/bw\b|body weight|plank|bird dog|superman|deadbug/.test(s)) return 2;
-      if(/goblet|db|kb|trap bar|bb\b|barbell|ssb|landmine|weighted|cable|trx|pull up|bench press/.test(s)) return 7;
+      if(/bw|body weight|plank|bird dog|superman|deadbug/.test(s)) return 2;
+      if(/goblet|db|kb|trap bar|bb|barbell|ssb|landmine|weighted|cable|trx|pull up|bench press/.test(s)) return 7;
       if(c2==='single leg') return 6;
       return 5;
     }
@@ -813,6 +836,48 @@
       const t=document.createElement('div'); t.className='toast'; t.textContent=msg; el.toastWrap.appendChild(t); setTimeout(()=>t.remove(),2600);
     }
 
+    function applyPaneWidths(leftW,rightW){
+      const left=Math.max(260,Math.min(620,leftW));
+      const right=Math.max(340,Math.min(760,rightW));
+      el.appGrid.style.setProperty('--leftW',left+'px');
+      el.appGrid.style.setProperty('--rightW',right+'px');
+      localStorage.setItem('engageWorkoutPaneWidths',JSON.stringify({left,right}));
+    }
+
+    function loadPaneWidths(){
+      try{
+        const raw=JSON.parse(localStorage.getItem('engageWorkoutPaneWidths')||'null');
+        if(raw&&raw.left&&raw.right) applyPaneWidths(raw.left,raw.right);
+      }catch(e){}
+    }
+
+    function initSplitters(){
+      const bind=(splitter,side)=>{
+        splitter.addEventListener('mousedown',e=>{
+          e.preventDefault();
+          splitter.classList.add('dragging');
+          const startX=e.clientX;
+          const rect=el.appGrid.getBoundingClientRect();
+          const currentLeft=parseFloat(getComputedStyle(el.appGrid).getPropertyValue('--leftW'))||360;
+          const currentRight=parseFloat(getComputedStyle(el.appGrid).getPropertyValue('--rightW'))||520;
+          const onMove=ev=>{
+            const dx=ev.clientX-startX;
+            if(side==='left') applyPaneWidths(currentLeft+dx,currentRight);
+            else applyPaneWidths(currentLeft,currentRight-dx);
+          };
+          const onUp=()=>{
+            splitter.classList.remove('dragging');
+            window.removeEventListener('mousemove',onMove);
+            window.removeEventListener('mouseup',onUp);
+          };
+          window.addEventListener('mousemove',onMove);
+          window.addEventListener('mouseup',onUp);
+        });
+      };
+      bind(el.splitterLeft,'left');
+      bind(el.splitterRight,'right');
+    }
+
     async function loadAll(){
       const moveUrl=el.movementsUrl.value.trim();
       const modsUrl=el.modsUrl.value.trim();
@@ -855,6 +920,8 @@
     document.getElementById('showBlastBtn').onclick=()=>document.querySelector('.section:nth-child(3)')?.scrollIntoView({behavior:'smooth',block:'start'});
 
     loadLocal();
+    loadPaneWidths();
+    initSplitters();
     renderBuilder();
     renderStats();
     renderDetail();
