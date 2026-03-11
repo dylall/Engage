@@ -224,7 +224,7 @@
           <div class="pad controls">
             <div class="group">
               <div class="label">Movement CSV URL</div>
-              <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?gid=566654820&single=true&output=csv" />
+              <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?gid=827281054&single=true&output=csv" />
             </div>
             <div class="group">
               <div class="label">Mods CSV URL</div>
@@ -571,32 +571,54 @@
     function parseMovementMatrix(text){
       const rows=csvParse(text);
       return rows.map((row,index)=>{
+        const idKey=findKey(row,['ID']);
+        const nameKey=findKey(row,['Exercise','Name','Move','Movement']);
         const categoryKey=findKey(row,['Category']);
         const subcategoryKey=findKey(row,['Subcategory']);
-        const exerciseKey=findKey(row,['Exercise','Name','Move','Movement']);
-        const urlKey=findKey(row,['URL','Link']);
-        const category1=norm(row[categoryKey]);
-        const category2=norm(row[subcategoryKey]);
-        const name=norm(row[exerciseKey]);
-        const link=norm(row[urlKey]);
-        const muscles=inferMuscles(category1,category2);
+        const stageKey=findKey(row,['Stage']);
+        const equipment1Key=findKey(row,['Equipment']);
+        const equipment2Key=findKey(row,['Equipment2']);
+        const equipment3Key=findKey(row,['Equipment3']);
+        const primaryMuscleKey=findKey(row,['PrimaryMuscle']);
+        const primaryWeightKey=findKey(row,['PrimaryWeight']);
+        const secondaryMuscleKey=findKey(row,['SecondaryMuscle']);
+        const secondaryWeightKey=findKey(row,['SecondaryWeight']);
+        const tertiaryMuscleKey=findKey(row,['TertiaryMuscle']);
+        const tertiaryWeightKey=findKey(row,['TertiaryWeight']);
+        const pushPullKey=findKey(row,['PushPull','Push/Pull']);
+        const cardioKey=findKey(row,['CardioIntensity','Cardio Intensity']);
+        const resistanceKey=findKey(row,['ResistanceIntensity','Resistance Intensity']);
+        const videoKey=findKey(row,['VideoURL','URL','Link']);
+        const altGroupKey=findKey(row,['AltGroup']);
+        const notesKey=findKey(row,['Notes']);
+        const activeKey=findKey(row,['Active']);
+
+        const name=norm(row[nameKey]);
+        const activeVal=lower(row[activeKey]||'true');
+        if(!name || activeVal==='false' || activeVal==='0' || activeVal==='no') return null;
+
+        const muscles=[norm(row[primaryMuscleKey]),norm(row[secondaryMuscleKey]),norm(row[tertiaryMuscleKey])].filter(Boolean);
+        const muscleWeights=[num(row[primaryWeightKey]),num(row[secondaryWeightKey]),num(row[tertiaryWeightKey])].slice(0,muscles.length);
+        const equipment=[norm(row[equipment1Key]),norm(row[equipment2Key]),norm(row[equipment3Key])].filter(Boolean);
+
         return {
-          id:'mv'+index,
+          id:norm(row[idKey])||('mv'+index),
           raw:row,
           name,
-          link:/^https?:\/\//i.test(link)?link:'',
-          equipment:inferEquipmentFromName(name,category1,category2),
+          link:norm(row[videoKey]),
+          equipment,
           muscles,
-          muscleWeights:muscles.map((_,i)=>i===0?3:i===1?2:1),
-          pushPull:inferPushPull(category1),
-          cardio:inferCardio(category1,category2,name),
-          resistance:inferResistance(category1,category2,name),
-          stage:inferStage(category1),
-          notes:'',
-          category1,
-          category2
+          muscleWeights,
+          pushPull:norm(row[pushPullKey]),
+          cardio:num(row[cardioKey]),
+          resistance:num(row[resistanceKey]),
+          stage:norm(row[stageKey]).toUpperCase(),
+          notes:norm(row[notesKey]),
+          category1:norm(row[categoryKey]),
+          category2:norm(row[subcategoryKey]),
+          altGroup:norm(row[altGroupKey])
         };
-      }).filter(m=>m.name);
+      }).filter(Boolean);
     }
 
     function buildChipGroup(target,items,setRef){
@@ -728,7 +750,7 @@
         el.detailVideo.load();
         el.detailVideoMsg.textContent='No playable video URL on this row.';
       }
-      const alts=state.mods.filter(x=> lower(x.move)===lower(m.name) || lower(x.alt).includes(lower(m.name)));
+      const alts=state.mods.filter(x=> lower(x.move)===lower(m.name) || lower(x.alt).includes(lower(m.name)) || (m.altGroup && lower(x.move)===lower(m.altGroup)));
       el.altsList.innerHTML=alts.length?alts.map(a=>`<div class="alt-item"><div style="font-weight:900">${escapeHtml(a.alt||a.move||'Alt move')}</div><div class="tiny">${escapeHtml(a.notes||'')}</div>${a.link?`<div class="tiny" style="margin-top:6px"><a href="${escapeAttr(a.link)}" target="_blank" style="color:#89d9f0">Open link</a></div>`:''}</div>`).join(''):'<div class="muted">No matching alternate rows found.</div>';
     }
 
