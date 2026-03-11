@@ -65,6 +65,7 @@
       overflow:hidden;
     }
     .left,.center,.right{display:flex;flex-direction:column;min-height:0}
+    .left{overflow:hidden}
     .hdr{
       padding:14px 16px;
       border-bottom:1px solid rgba(78,195,230,.25);
@@ -79,6 +80,7 @@
     .sub{font-size:12px;color:var(--muted)}
     .pad{padding:12px}
     .scroll{overflow:auto;min-height:0}
+    .left-scroll{overflow:auto;min-height:0;display:flex;flex-direction:column}
     .controls{display:grid;gap:10px}
     .group{display:grid;gap:6px}
     .label{font-size:12px;color:var(--soft);font-weight:800;text-transform:uppercase;letter-spacing:.08em}
@@ -211,41 +213,51 @@
   <div class="app" id="appGrid">
     <section class="panel left pane">
       <div class="hdr"><div><div class="brand">ENGAGE Workout Builder</div><div class="sub">Live planner for PRIME / BUILD / BLAST</div></div><button id="reloadBtn">Reload Data</button></div>
-      <div class="pad controls">
-        <div class="group">
-          <div class="label">Movement CSV URL</div>
-          <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?gid=566654820&single=true&output=csv" />
+      <div class="left-scroll" id="leftScroll">
+        <div class="pad" style="padding-bottom:8px">
+          <div class="small-btns">
+            <button id="toggleFiltersBtn">Hide Filters</button>
+            <button id="toggleBadgesBtn">Hide Badges</button>
+          </div>
         </div>
-        <div class="group">
-          <div class="label">Mods CSV URL</div>
-          <input id="modsUrl" value="" placeholder="Optional for now" />
+        <div id="filtersWrap">
+          <div class="pad controls">
+            <div class="group">
+              <div class="label">Movement CSV URL</div>
+              <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?gid=566654820&single=true&output=csv" />
+            </div>
+            <div class="group">
+              <div class="label">Mods CSV URL</div>
+              <input id="modsUrl" value="" placeholder="Optional for now" />
+            </div>
+            <div class="group">
+              <div class="label">Search</div>
+              <input id="searchInput" placeholder="Search move name" />
+            </div>
+            <div class="group">
+              <div class="label">Sort</div>
+              <select id="sortSelect">
+                <option value="name">Name</option>
+                <option value="resistance_desc">Resistance Intensity</option>
+                <option value="cardio_desc">Cardio Intensity</option>
+                <option value="stage">Stage</option>
+              </select>
+            </div>
+            <div class="group filter-group"><div class="label">Stage</div><div class="chips" id="stageChips"></div></div>
+            <div class="group filter-group"><div class="label">Equipment</div><div class="chips" id="equipmentChips"></div></div>
+            <div class="group filter-group"><div class="label">Hide Equipment</div><div class="chips" id="equipmentHideChips"></div></div>
+            <div class="group filter-group"><div class="label">Muscle Group</div><div class="chips" id="muscleChips"></div></div>
+          </div>
         </div>
-        <div class="group">
-          <div class="label">Search</div>
-          <input id="searchInput" placeholder="Search move name" />
+        <div class="pad" id="statsWrap" style="padding-top:0">
+          <div class="stats">
+            <div class="chip" id="countChip">0 moves</div>
+            <div class="chip" id="dataChip">No data</div>
+          </div>
         </div>
-        <div class="group">
-          <div class="label">Sort</div>
-          <select id="sortSelect">
-            <option value="name">Name</option>
-            <option value="resistance_desc">Resistance Intensity</option>
-            <option value="cardio_desc">Cardio Intensity</option>
-            <option value="stage">Stage</option>
-          </select>
+        <div class="pad" style="padding-top:0;min-height:0;flex:1;display:flex;flex-direction:column">
+          <div class="list" id="moveList"></div>
         </div>
-        <div class="group"><div class="label">Stage</div><div class="chips" id="stageChips"></div></div>
-        <div class="group"><div class="label">Equipment</div><div class="chips" id="equipmentChips"></div></div>
-        <div class="group"><div class="label">Hide Equipment</div><div class="chips" id="equipmentHideChips"></div></div>
-        <div class="group"><div class="label">Muscle Group</div><div class="chips" id="muscleChips"></div></div>
-      </div>
-      <div class="pad" style="padding-top:0">
-        <div class="stats">
-          <div class="chip" id="countChip">0 moves</div>
-          <div class="chip" id="dataChip">No data</div>
-        </div>
-      </div>
-      <div class="scroll pad" style="padding-top:0">
-        <div class="list" id="moveList"></div>
       </div>
     </section>
     <div class="splitter" id="splitterLeft" title="Drag to resize"></div>
@@ -367,6 +379,10 @@
       muscleChips:document.getElementById('muscleChips'),
       moveList:document.getElementById('moveList'),
       countChip:document.getElementById('countChip'),
+      toggleFiltersBtn:document.getElementById('toggleFiltersBtn'),
+      toggleBadgesBtn:document.getElementById('toggleBadgesBtn'),
+      filtersWrap:document.getElementById('filtersWrap'),
+      statsWrap:document.getElementById('statsWrap'),
       dataChip:document.getElementById('dataChip'),
       detailName:document.getElementById('detailName'),
       detailTags:document.getElementById('detailTags'),
@@ -820,7 +836,13 @@
     }
 
     function saveLocal(){
-      localStorage.setItem('engageWorkoutBuilderState',JSON.stringify({plan:state.plan,movementsUrl:el.movementsUrl.value,modsUrl:el.modsUrl.value}));
+      localStorage.setItem('engageWorkoutBuilderState',JSON.stringify({
+        plan:state.plan,
+        movementsUrl:el.movementsUrl.value,
+        modsUrl:el.modsUrl.value,
+        filtersCollapsed:el.filtersWrap?.style.display==='none',
+        badgesCollapsed:el.statsWrap?.style.display==='none'
+      }));
     }
     function loadLocal(){
       try{
@@ -829,6 +851,8 @@
         if(raw.plan) state.plan=raw.plan;
         if(raw.movementsUrl) el.movementsUrl.value=raw.movementsUrl;
         if(raw.modsUrl) el.modsUrl.value=raw.modsUrl;
+        if(raw.filtersCollapsed) el.filtersWrap.style.display='none';
+        if(raw.badgesCollapsed) el.statsWrap.style.display='none';
       }catch(e){}
     }
 
@@ -914,12 +938,26 @@
     el.reloadBtn.onclick=loadAll;
     el.clearBtn.onclick=()=>{ if(confirm('Clear assigned workout?')){ state.plan={prime:[null,null,null],build:{day1:{block1:[null,null],block2:[null,null]},day2:{block1:[null,null],block2:[null,null]},day3:{block1:[null,null],block2:[null,null]}},blast:[null,null,null,null]}; renderBuilder(); renderStats(); saveLocal(); } };
     el.saveBtn.onclick=()=>{ saveLocal(); showToast('Saved locally in browser.'); };
+    el.toggleFiltersBtn.onclick=()=>{
+      const hidden=el.filtersWrap.style.display==='none';
+      el.filtersWrap.style.display=hidden?'':'none';
+      el.toggleFiltersBtn.textContent=hidden?'Hide Filters':'Show Filters';
+      saveLocal();
+    };
+    el.toggleBadgesBtn.onclick=()=>{
+      const hidden=el.statsWrap.style.display==='none';
+      el.statsWrap.style.display=hidden?'':'none';
+      el.toggleBadgesBtn.textContent=hidden?'Hide Badges':'Show Badges';
+      saveLocal();
+    };
 
     document.getElementById('showPrimeBtn').onclick=()=>document.querySelector('.section:nth-child(1)')?.scrollIntoView({behavior:'smooth',block:'start'});
     document.getElementById('showBuildBtn').onclick=()=>document.querySelector('.section:nth-child(2)')?.scrollIntoView({behavior:'smooth',block:'start'});
     document.getElementById('showBlastBtn').onclick=()=>document.querySelector('.section:nth-child(3)')?.scrollIntoView({behavior:'smooth',block:'start'});
 
     loadLocal();
+    if(el.filtersWrap.style.display==='none') el.toggleFiltersBtn.textContent='Show Filters';
+    if(el.statsWrap.style.display==='none') el.toggleBadgesBtn.textContent='Show Badges';
     loadPaneWidths();
     initSplitters();
     renderBuilder();
