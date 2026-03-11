@@ -196,7 +196,7 @@
       <div class="pad controls">
         <div class="group">
           <div class="label">Movement CSV URL</div>
-          <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?output=csv" />
+          <input id="movementsUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1QCHbNbw6iq3GgPoZqCLQ7pwY64pITSN4m0FJ6e0RZ_pfoTG6lk-euX18ChYqiGG-nSOwBSaRiLBF/pub?gid=566654820&single=true&output=csv" />
         </div>
         <div class="group">
           <div class="label">Mods CSV URL</div>
@@ -217,6 +217,7 @@
         </div>
         <div class="group"><div class="label">Stage</div><div class="chips" id="stageChips"></div></div>
         <div class="group"><div class="label">Equipment</div><div class="chips" id="equipmentChips"></div></div>
+        <div class="group"><div class="label">Hide Equipment</div><div class="chips" id="equipmentHideChips"></div></div>
         <div class="group"><div class="label">Muscle Group</div><div class="chips" id="muscleChips"></div></div>
       </div>
       <div class="pad" style="padding-top:0">
@@ -315,7 +316,7 @@
       movements:[],
       mods:[],
       selectedMove:null,
-      filters:{stage:new Set(),equipment:new Set(),muscle:new Set(),search:'',sort:'name'},
+      filters:{stage:new Set(),equipment:new Set(),hideEquipment:new Set(),muscle:new Set(),search:'',sort:'name'},
       plan:{
         prime:[null,null,null],
         build:{
@@ -327,7 +328,7 @@
       }
     };
 
-    const EQUIPMENT_ORDER=['Body Weight','Dumbbell','Kettlebell','Barbell','Bosu','Bench','Medball','Yogaball','Cables','Pullup Bands','MiniBands'];
+    const EQUIPMENT_ORDER=['Body Weight','Dumbbell','Kettlebell','Barbell','Bosu','Bench','Medball','Yogaball','Cables','Pullup Bands','MiniBands','Bike','Ropes','Tank','Trap Bar','SSB','Landmine','TRX','Slider'];
     const STAGES=['PRIME','BUILD','BLAST'];
     const MUSCLE_TARGETS=['Chest','Back','Shoulders','Biceps','Triceps','Core','Glutes','Quads','Hamstrings','Calves','Adductors','Abductors'];
 
@@ -339,6 +340,7 @@
       sortSelect:document.getElementById('sortSelect'),
       stageChips:document.getElementById('stageChips'),
       equipmentChips:document.getElementById('equipmentChips'),
+      equipmentHideChips:document.getElementById('equipmentHideChips'),
       muscleChips:document.getElementById('muscleChips'),
       moveList:document.getElementById('moveList'),
       countChip:document.getElementById('countChip'),
@@ -442,21 +444,28 @@
       };
     }
 
-    function inferEquipmentFromName(name){
-      const s=lower(name);
+    function inferEquipmentFromName(name,category,subcategory){
+      const s=lower(name), c=lower(category), sc=lower(subcategory);
       const out=[];
-      if(/bw|body weight|push up|plank|bird dog|superman|pogo|mile|sprint/.test(s)) out.push('Body Weight');
-      if(/db|dumbbell|goblet/.test(s)) out.push('Dumbbell');
-      if(/kb|kettlebell/.test(s)) out.push('Kettlebell');
-      if(/barbell/.test(s)) out.push('Barbell');
+      if(/\bbw\b|body weight|push up|plank|bird dog|superman|pogo|mile|sprint|pull up|walking lunge/.test(s)) out.push('Body Weight');
+      if(/\bdb\b|dumbbell|goblet|bench press/.test(s)) out.push('Dumbbell');
+      if(/\bkb\b|kettlebell|racked squat/.test(s)) out.push('Kettlebell');
+      if(/\bbb\b|barbell|front squat|rdl|sumo deadlift/.test(s)) out.push('Barbell');
       if(/bosu/.test(s)) out.push('Bosu');
-      if(/bench|step up|back elevated/.test(s)) out.push('Bench');
-      if(/med ball|slam|chest pass/.test(s)) out.push('Medball');
+      if(/bench|step up|elevated|rear foot elevated|front foot elevated|box squat/.test(s)) out.push('Bench');
+      if(/med ball|slam/.test(s)) out.push('Medball');
       if(/yoga ball|stability ball/.test(s)) out.push('Yogaball');
-      if(/cable|pallof|pulldown|row/.test(s)) out.push('Cables');
-      if(/pull up|trx/.test(s)) out.push('Pullup Bands');
+      if(/cable|pallof|pulldown|face pull|row/.test(s)) out.push('Cables');
+      if(/pull up/.test(s)) out.push('Pullup Bands');
       if(/mini band/.test(s)) out.push('MiniBands');
-      if(/bike/.test(s)) out.push('Bike');
+      if(/bike|mile|sprint/.test(s) || sc==='bike') out.push('Bike');
+      if(/waves/.test(s) || sc==='ropes') out.push('Ropes');
+      if((/forward push|reverse pull/.test(s) || sc==='tank') && c==='endurance') out.push('Tank');
+      if(/trap bar/.test(s)) out.push('Trap Bar');
+      if(/\bssb\b/.test(s)) out.push('SSB');
+      if(/landmine/.test(s)) out.push('Landmine');
+      if(/trx/.test(s)) out.push('TRX');
+      if(/slider/.test(s)) out.push('Slider');
       return [...new Set(out)];
     }
 
@@ -475,24 +484,21 @@
 
     function inferMuscles(category1,category2){
       const c1=lower(category1), c2=lower(category2);
-      if(c1==='hinge') return ['Glutes','Hamstrings'];
+      if(c1==='hinge') return c2==='knee flexion'?['Hamstrings','Glutes']:['Glutes','Hamstrings'];
       if(c1==='squat') return ['Quads','Glutes'];
-      if(c1==='split') return ['Quads','Glutes'];
+      if(c1==='split') return c2==='single leg'?['Quads','Glutes','Core']:['Quads','Glutes'];
       if(c1==='push') return c2==='vertical'?['Shoulders','Triceps','Chest']:['Chest','Triceps','Shoulders'];
       if(c1==='pull') return c2==='vertical'?['Back','Biceps']:['Back','Biceps'];
       if(c1==='core'){
         if(c2.includes('rotation')) return ['Core','Obliques'];
-        if(c2.includes('extension')) return ['Core','Lower Back'];
+        if(c2.includes('extension') || c2.includes('bird')) return ['Core','Lower Back'];
         return ['Core'];
       }
-      if(c1==='power' || c1==='power/impact'){
-        if(c2==='med ball') return ['Core','Shoulders'];
-        return ['Glutes','Quads','Calves'];
-      }
+      if(c1==='power') return ['Glutes','Quads','Calves'];
       if(c1==='endurance'){
         if(c2==='bike') return ['Quads','Calves'];
         if(c2==='ropes') return ['Shoulders','Core'];
-        if(c2==='tank' || c2==='resistance') return ['Quads','Glutes','Core'];
+        if(c2==='tank') return ['Quads','Glutes','Core'];
       }
       return [];
     }
@@ -500,61 +506,55 @@
     function inferResistance(category1,category2,name){
       const s=lower(name);
       const c1=lower(category1), c2=lower(category2);
-      if(['power','power/impact','endurance'].includes(c1)) return c1==='endurance'?5:6;
-      if(c1==='core') return /carry/.test(s)?6:4;
-      if(/bw|body weight|elevated|bird dog|plank|superman|carry/.test(s)) return 4;
-      if(/goblet|db|kb|bb|barbell|landmine|weighted|cable|trx|pull up|pulldown|bench press|row/.test(s)) return 7;
-      if(c2==='single leg') return 7;
-      return 6;
+      if(c1==='endurance') return 3;
+      if(c1==='power') return 5;
+      if(c1==='core') return /side plank|pallof/.test(s)?5:3;
+      if(/bw\b|body weight|plank|bird dog|superman|deadbug/.test(s)) return 2;
+      if(/goblet|db|kb|trap bar|bb\b|barbell|ssb|landmine|weighted|cable|trx|pull up|bench press/.test(s)) return 7;
+      if(c2==='single leg') return 6;
+      return 5;
     }
 
     function inferCardio(category1,category2,name){
       const s=lower(name);
-      const c1=lower(category1), c2=lower(category2);
+      const c1=lower(category1);
       if(c1==='endurance') return 9;
-      if(c1==='power' || c1==='power/impact') return 8;
-      if(c1==='core') return 3;
-      if(/jump|hop|sprint|mile|waves|tank|slam|clean/.test(s)) return 8;
-      if(/plank|bird dog|superman|carry/.test(s)) return 3;
-      return 4;
+      if(c1==='power') return 8;
+      if(c1==='core') return 2;
+      if(/jump|sprint|mile|waves/.test(s)) return 8;
+      if(/walking lunge|step up/.test(s)) return 5;
+      return 3;
     }
 
     function parseMovementMatrix(text){
-      const rawRows=csvParse(text).map(r=>Object.values(r).map(norm));
-      if(rawRows.length<3) return [];
-      const top=rawRows[0];
-      const sub=rawRows[1];
-      const out=[];
-      for(let r=2;r<rawRows.length;r++){
-        const row=rawRows[r];
-        for(let c=0;c<row.length;c+=2){
-          const name=norm(row[c]);
-          const link=norm(row[c+1]);
-          const category1=norm(top[c]);
-          const category2=norm(sub[c]);
-          const subUrlHeader=norm(sub[c+1]);
-          if(!name || !category1 || !category2) continue;
-          const stage=inferStage(category1);
-          const muscles=inferMuscles(category1,category2);
-          out.push({
-            id:'mx'+r+'_'+c,
-            raw:{category1,category2,name,link,subUrlHeader},
-            name,
-            link:/^https?:\/\//i.test(link)?link:'',
-            equipment:inferEquipmentFromName(name),
-            muscles,
-            muscleWeights:muscles.map((_,i)=>i===0?3:i===1?2:1),
-            pushPull:inferPushPull(category1),
-            cardio:inferCardio(category1,category2,name),
-            resistance:inferResistance(category1,category2,name),
-            stage,
-            notes:'',
-            category1,
-            category2
-          });
-        }
-      }
-      return out;
+      const rows=csvParse(text);
+      return rows.map((row,index)=>{
+        const categoryKey=findKey(row,['Category']);
+        const subcategoryKey=findKey(row,['Subcategory']);
+        const exerciseKey=findKey(row,['Exercise','Name','Move','Movement']);
+        const urlKey=findKey(row,['URL','Link']);
+        const category1=norm(row[categoryKey]);
+        const category2=norm(row[subcategoryKey]);
+        const name=norm(row[exerciseKey]);
+        const link=norm(row[urlKey]);
+        const muscles=inferMuscles(category1,category2);
+        return {
+          id:'mv'+index,
+          raw:row,
+          name,
+          link:/^https?:\/\//i.test(link)?link:'',
+          equipment:inferEquipmentFromName(name,category1,category2),
+          muscles,
+          muscleWeights:muscles.map((_,i)=>i===0?3:i===1?2:1),
+          pushPull:inferPushPull(category1),
+          cardio:inferCardio(category1,category2,name),
+          resistance:inferResistance(category1,category2,name),
+          stage:inferStage(category1),
+          notes:'',
+          category1,
+          category2
+        };
+      }).filter(m=>m.name);
     }
 
     function buildChipGroup(target,items,setRef){
@@ -572,10 +572,14 @@
     }
 
     function renderChips(){
-      const allEquipment=[...new Set(state.movements.flatMap(m=>m.equipment))].sort((a,b)=>EQUIPMENT_ORDER.indexOf(a)-EQUIPMENT_ORDER.indexOf(b)||a.localeCompare(b));
+      const allEquipment=[...new Set(state.movements.flatMap(m=>m.equipment))].sort((a,b)=>{
+        const ai=EQUIPMENT_ORDER.indexOf(a), bi=EQUIPMENT_ORDER.indexOf(b);
+        return (ai===-1?999:ai)-(bi===-1?999:bi)||a.localeCompare(b);
+      });
       const allMuscles=[...new Set(state.movements.flatMap(m=>m.muscles))].sort();
       buildChipGroup(el.stageChips,STAGES,state.filters.stage);
       buildChipGroup(el.equipmentChips,allEquipment,state.filters.equipment);
+      buildChipGroup(el.equipmentHideChips,allEquipment,state.filters.hideEquipment);
       buildChipGroup(el.muscleChips,allMuscles,state.filters.muscle);
     }
 
@@ -585,6 +589,7 @@
         if(!m.name) return false;
         if(state.filters.stage.size && !state.filters.stage.has(m.stage)) return false;
         if(state.filters.equipment.size && !m.equipment.some(e=>state.filters.equipment.has(e))) return false;
+        if(state.filters.hideEquipment.size && m.equipment.some(e=>state.filters.hideEquipment.has(e))) return false;
         if(state.filters.muscle.size && !m.muscles.some(g=>state.filters.muscle.has(g))) return false;
         if(q && !(`${m.name} ${m.equipment.join(' ')} ${m.muscles.join(' ')} ${m.stage}`).toLowerCase().includes(q)) return false;
         return true;
@@ -645,7 +650,7 @@
         return;
       }
       el.detailName.textContent=m.name;
-      el.detailTags.innerHTML=`<span>${escapeHtml(m.stage||'—')}</span><span>Resistance ${m.resistance||0}</span><span>Cardio ${m.cardio||0}</span>`;
+      el.detailTags.innerHTML=`<span>${escapeHtml(m.stage||'—')}</span><span>${escapeHtml(m.category1||'—')}</span><span>${escapeHtml(m.category2||'—')}</span><span>Resistance ${m.resistance||0}</span><span>Cardio ${m.cardio||0}</span>`;
       el.detailKv.innerHTML=`
         <div>Body Part</div><div>${escapeHtml(m.muscles.join(', ')||'—')}</div>
         <div>Equipment</div><div>${escapeHtml(m.equipment.join(', ')||'—')}</div>
@@ -653,6 +658,8 @@
         <div>Cardio</div><div>${m.cardio||0}</div>
         <div>Push / Pull</div><div>${escapeHtml(m.pushPull||'—')}</div>
         <div>Stage</div><div>${escapeHtml(m.stage||'—')}</div>
+        <div>Category</div><div>${escapeHtml(m.category1||'—')}</div>
+        <div>Subcategory</div><div>${escapeHtml(m.category2||'—')}</div>
       `;
       const emb=convertToEmbeddable(m.link);
       if(emb) el.detailFrame.src=emb;
@@ -830,7 +837,7 @@
       }catch(err){
         console.error(err);
         el.dataChip.textContent='Load failed';
-        showToast('CSV load failed. Use hosted app or local file import.');
+        showToast('CSV load failed. Check published CSV URL or use hosted app.');
       }
     }
 
